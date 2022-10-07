@@ -1,0 +1,25 @@
+# PlanetWormhole
+
+Automatically transfer cargos within a planet. You do not need planetary logistics now!
+
+## Configurations
+
+||Default|Description|
+|:---|:---|:---|
+|`Enable`|true|enable this plugin|
+
+---
+# 行星虫洞
+
+自动运输行星内的货物，你不再需要行星内物流系统了
+
+## 配置
+||默认值|描述|
+|:---|:---|:---|
+|`Enable`|true|启动这个插件|
+
+## ChangeLog
+
+### 1.0.0
+
+Initial version of this plugin
