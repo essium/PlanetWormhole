@@ -593,8 +593,12 @@ namespace PlanetWormhole.Data
             StorageComponent[] storagePool = factory.factoryStorage.storagePool;
             for (int i = 1; i < factory.factoryStorage.storageCursor; i++)
             {
-                if (storagePool[i].id == i)
+                if (storagePool[i] != null && storagePool[i].id == i)
                 {
+                    if (storagePool[i].grids == null)
+                    {
+                        continue;
+                    }
                     for(int j = 0; j < storagePool[i].grids.Length; j++)
                     {
                         if (storagePool[i].grids[j].itemId > 0)
@@ -622,8 +626,13 @@ namespace PlanetWormhole.Data
             StorageComponent[] storagePool = factory.factoryStorage.storagePool;
             for (int i = 1; i < factory.factoryStorage.storageCursor; i++)
             {
-                if (storagePool[i].id == i)
+                if (storagePool[i] != null && storagePool[i].id == i)
                 {
+                    if (storagePool[i].grids == null)
+                    {
+                        continue;
+                    }
+                    bool change = false;
                     for (int j = 0; j < storagePool[i].grids.Length; j++)
                     {
                         if (storagePool[i].grids[j].itemId > 0)
@@ -634,11 +643,25 @@ namespace PlanetWormhole.Data
                                 int count = Math.Min(storagePool[i].grids[j].count, servedQuota[itemIndex] - produced[itemIndex]);
                                 produced[itemIndex] += count;
                                 storagePool[i].grids[j].count -= count;
+                                if (storagePool[i].grids[j].count <= 0)
+                                {
+                                    storagePool[i].grids[j].itemId = 0;
+                                    storagePool[i].grids[j].count = 0;
+                                    storagePool[i].grids[j].inc = 0;
+                                }
                                 int incAdd = splitInc(storagePool[i].grids[j].inc, count);
                                 inc += incAdd;
                                 storagePool[i].grids[j].inc -= incAdd;
+                                if (count > 0)
+                                {
+                                    change = true;
+                                }
                             }
                         }
+                    }
+                    if (change)
+                    {
+                        storagePool[i].NotifyStorageChange();
                     }
                 }
             }
@@ -655,6 +678,12 @@ namespace PlanetWormhole.Data
                             int count = Math.Min(tankPool[i].fluidCount, servedQuota[itemIndex] - produced[itemIndex]);
                             produced[itemIndex] += count;
                             tankPool[i].fluidCount -= count;
+                            if (tankPool[i].fluidCount <= 0)
+                            {
+                                tankPool[i].fluidId = 0;
+                                tankPool[i].fluidCount = 0;
+                                tankPool[i].fluidInc = 0;
+                            }
                             int incAdd = splitInc(tankPool[i].fluidInc, count);
                             inc += incAdd;
                             tankPool[i].fluidInc -= incAdd;
