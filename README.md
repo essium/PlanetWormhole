@@ -20,6 +20,10 @@ Automatically transfer cargos within a planet. You do not need planetary logisti
 
 ## ChangeLog
 
+### 1.0.2
+
+Fix spray logic
+
 ### 1.0.1
 
 Refresh storage

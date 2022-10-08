@@ -11,6 +11,7 @@ namespace PlanetWormhole.Data
         private static int INC_SPRAY_TIMES;
         private static int INC_ABILITY;
         private static int EXTRA_INC_SPRAY_TIMES;
+        private static int SPRAY_RANGE;
         private int[] producedQuota;
         private int[] servedQuota;
         private int[] produced;
@@ -54,6 +55,7 @@ namespace PlanetWormhole.Data
             Array.Clear(servedQuota, 0, N);
             Array.Clear(produced, 0, N);
             Array.Clear(served, 0, N);
+            spray = true;
         }
 
         private void RegisterAssembler(PlanetFactory factory)
@@ -197,6 +199,22 @@ namespace PlanetWormhole.Data
             {
                 if (pool[i].id == i && pool[i].storage != null)
                 {
+                    if (pool[i].needs[5] == Constants.WARPER && factory.gameData.history.TechUnlocked(Constants.SHIP_ENGINE_4))
+                    {
+                        int warperIndex = itemId2Index[Constants.WARPER];
+                        if (producedQuota[warperIndex] > served[warperIndex])
+                        {
+                            int count = Math.Min(pool[i].warperMaxCount - pool[i].warperCount, producedQuota[warperIndex] - served[warperIndex]);
+                            served[warperIndex] += count;
+                            pool[i].warperCount += count;
+                        }
+                    }
+                }
+            }
+            for (int i = 1; i < factory.transport.stationCursor; i++)
+            {
+                if (pool[i].id == i && pool[i].storage != null)
+                {
                     StationStore[] storage = pool[i].storage;
                     for (int j = 0; j < storage.Length; j++)
                     {
@@ -222,16 +240,6 @@ namespace PlanetWormhole.Data
                                     served[itemIndex] += count;
                                     storage[j].count += count;
                                 }
-                            }
-                        }
-                        if (pool[i].needs[5] == Constants.WARPER && factory.gameData.history.TechUnlocked(Constants.SHIP_ENGINE_4))
-                        {
-                            int warperIndex = itemId2Index[Constants.WARPER];
-                            if (producedQuota[warperIndex] > served[warperIndex])
-                            {
-                                int count = Math.Min(pool[i].warperMaxCount - pool[i].warperCount, producedQuota[warperIndex] - served[warperIndex]);
-                                served[warperIndex] += count;
-                                pool[i].warperCount += count;
                             }
                         }
                     }
@@ -695,15 +703,18 @@ namespace PlanetWormhole.Data
 
         private void Spray()
         {
-            if (inc >= 100)
+            if (inc < SPRAY_RANGE)
             {
-                spray = true;
-            } else if (producedQuota[PROLIF_MK3_INDEX] * (INC_SPRAY_TIMES + EXTRA_INC_SPRAY_TIMES - 1) >= (100 - inc))
-            {
-                spray = true;
-                servedQuota[PROLIF_MK3_INDEX] = (100 - inc) / (INC_SPRAY_TIMES + EXTRA_INC_SPRAY_TIMES - 1);
-                inc += servedQuota[PROLIF_MK3_INDEX] * (INC_SPRAY_TIMES + EXTRA_INC_SPRAY_TIMES - 1);
-            } else
+                if (producedQuota[PROLIF_MK3_INDEX] > served[PROLIF_MK3_INDEX])
+                {
+                    int count = Math.Min(
+                        (SPRAY_RANGE - inc) / (INC_SPRAY_TIMES + EXTRA_INC_SPRAY_TIMES - 1), producedQuota[PROLIF_MK3_INDEX] - served[PROLIF_MK3_INDEX]);
+                    inc += count * (INC_SPRAY_TIMES + EXTRA_INC_SPRAY_TIMES - 1);
+                    servedQuota[PROLIF_MK3_INDEX] += count;
+                    served[PROLIF_MK3_INDEX] += count;
+                }
+            }
+            if (inc < 1)
             {
                 spray = false;
             }
@@ -737,6 +748,7 @@ namespace PlanetWormhole.Data
             INC_SPRAY_TIMES = proto.HpMax;
             INC_ABILITY = proto.Ability;
             EXTRA_INC_SPRAY_TIMES = (int)(INC_SPRAY_TIMES * (Cargo.incTable[INC_ABILITY] * 0.001) + 0.1);
+            SPRAY_RANGE = 100 * (INC_SPRAY_TIMES + EXTRA_INC_SPRAY_TIMES - 1) + 1;
             PROLIF_MK3_INDEX = itemId2Index[Constants.PROLIFERATOR_MK3];
         }
     }
