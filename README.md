@@ -20,6 +20,10 @@ Automatically transfer cargos within a planet. You do not need planetary logisti
 
 ## ChangeLog
 
+### 1.0.3
+
+Do not get cargo from requirement slot
+
 ### 1.0.2
 
 Fix spray logic
