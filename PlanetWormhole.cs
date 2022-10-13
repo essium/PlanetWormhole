@@ -12,7 +12,7 @@ namespace PlanetWormhole
     {
         private const string package = "essium.DSP.PlanetWormhole";
         private const string plugin = "PlanetWormhole";
-        private const string version = "1.0.3";
+        private const string version = "1.0.4";
 
         private static ConfigEntry<bool> enable;
         private static List<Wormhole> wormholes;
@@ -33,7 +33,7 @@ namespace PlanetWormhole
         }
 
         [HarmonyPostfix, HarmonyPatch(typeof(GameData), "GameTick")]
-        private static void PatchGameTick(PlanetFactory __instance,
+        private static void _patch_GameData_GameTick(PlanetFactory __instance,
             long time,
             ref int ___factoryCount,
             ref PlanetFactory[] ___factories)
@@ -51,6 +51,26 @@ namespace PlanetWormhole
                 if (time % 30 == i % 30)
                 {
                     wormholes[i].Patch(___factories[i]);
+                }
+            }
+        }
+        [HarmonyPrefix, HarmonyPatch(typeof(ProductionStatistics), "GameTick")]
+        private static void _patch_ProductionStatistics_GameTick(ProductionStatistics __instance,
+            long time)
+        {
+            if (!enable.Value)
+            {
+                return;
+            }
+            for (int i = 0; i < __instance.gameData.factoryCount; i++)
+            {
+                if (time % 30 == (i + 1) % 30 && wormholes.Count > i)
+                {
+                    if (wormholes[i].consumedProliferator > 0)
+                    {
+                        __instance.factoryStatPool[i].consumeRegister[Constants.PROLIFERATOR_MK3] += wormholes[i].consumedProliferator;
+                        wormholes[i].consumedProliferator = 0;
+                    }
                 }
             }
         }

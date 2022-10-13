@@ -11,13 +11,17 @@ namespace PlanetWormhole.Data
         private static int INC_SPRAY_TIMES;
         private static int INC_ABILITY;
         private static int EXTRA_INC_SPRAY_TIMES;
+        private const int BUFFER_SIZE = 1000;
         private int[] producedQuota;
         private int[] servedQuota;
         private int[] produced;
         private int[] served;
+        private int[] buffer;
         private int inc;
+        public int consumedProliferator;
         private int sumSpray;
         private bool spray;
+        private PlanetFactory tmpFactory;
 
         public Wormhole()
         {
@@ -25,28 +29,34 @@ namespace PlanetWormhole.Data
             servedQuota = new int[N];
             produced = new int[N];
             served = new int[N];
+            buffer = new int[N];
+            Array.Clear(buffer, 0, N);
             inc = 0;
         }
         public void Patch(PlanetFactory factory)
         {
+            tmpFactory = factory;
             Reset();
-            RegisterPowerSystem(factory);
-            RegisterMiner(factory);
-            RegisterAssembler(factory);
-            RegisterLab(factory);
-            RegisterEjector(factory);
-            RegisterSilo(factory);
-            RegisterStorage(factory);
-            RegisterStation(factory);
+            RegisterTrash();
+            RegisterPowerSystem();
+            RegisterMiner();
+            RegisterAssembler();
+            RegisterLab();
+            RegisterEjector();
+            RegisterSilo();
+            RegisterStorage();
+            RegisterStation();
             Spray();
-            ConsumeStorage(factory);
-            ConsumePowerSystem(factory);
-            ConsumeMiner(factory);
-            ConsumeAssembler(factory);
-            ConsumeLab(factory);
-            ConsumeEjector(factory);
-            ConsumeSilo(factory);
-            ConsumeStation(factory);
+            ConsumeBuffer();
+            ConsumeTrash();
+            ConsumeStorage();
+            ConsumePowerSystem();
+            ConsumeMiner();
+            ConsumeAssembler();
+            ConsumeLab();
+            ConsumeEjector();
+            ConsumeSilo();
+            ConsumeStation();
         }
 
         private void Reset()
@@ -57,12 +67,13 @@ namespace PlanetWormhole.Data
             Array.Clear(served, 0, N);
             spray = true;
             sumSpray = 0;
+            consumedProliferator = 0;
         }
 
-        private void RegisterAssembler(PlanetFactory factory)
+        private void RegisterAssembler()
         {
-            AssemblerComponent[] pool = factory.factorySystem.assemblerPool;
-            for (int i = 1; i < factory.factorySystem.assemblerCursor; i++)
+            AssemblerComponent[] pool = tmpFactory.factorySystem.assemblerPool;
+            for (int i = 1; i < tmpFactory.factorySystem.assemblerCursor; i++)
             {
                 if (pool[i].id == i && pool[i].recipeId > 0)
                 {
@@ -86,12 +97,12 @@ namespace PlanetWormhole.Data
             }
         }
 
-        private void ConsumeAssembler(PlanetFactory factory)
+        private void ConsumeAssembler()
         {
-            AssemblerComponent[] pool = factory.factorySystem.assemblerPool;
-            for (int i = 1; i < factory.factorySystem.assemblerCursor; i++)
+            AssemblerComponent[] pool = tmpFactory.factorySystem.assemblerPool;
+            for (int i = 1; i < tmpFactory.factorySystem.assemblerCursor; i++)
             {
-                if (pool[i].id == i && pool[i].recipeId > 0 && pool[i].produced.Length > 1)
+                if (pool[i].id == i && pool[i].recipeId > 0)
                 {
                     for (int j = 0; j < pool[i].produced.Length; j++)
                     {
@@ -106,41 +117,44 @@ namespace PlanetWormhole.Data
                             }
                         }
                     }
-                    for (int j = 0; j < pool[i].requireCounts.Length; j++)
+                    if (pool[i].produced.Length > 1)
                     {
-                        if (pool[i].needs[j] > 0)
+                        int len = pool[i].produced.Length;
+                        switch (pool[i].recipeType)
                         {
-                            int itemIndex = itemId2Index[pool[i].needs[j]];
-                            if (producedQuota[itemIndex] > served[itemIndex])
-                            {
-                                int count = _positive(Math.Min(3 * pool[i].requireCounts[j] - pool[i].served[j], producedQuota[itemIndex] - served[itemIndex]));
-                                served[itemIndex] += count;
-                                pool[i].served[j] += count;
-                                if (spray)
+                            case ERecipeType.Smelt:
+                                for (int j = 0; j < len; j++)
                                 {
-                                    inc -= count;
-                                    pool[i].incServed[j] += INC_ABILITY * count;
+                                    if (pool[i].produced[j] + pool[i].productCounts[j] > 100
+                                        && buffer[itemId2Index[pool[i].products[j]]] < BUFFER_SIZE)
+                                    {
+                                        pool[i].produced[j] -= pool[i].productCounts[j];
+                                        buffer[itemId2Index[pool[i].products[j]]] += pool[i].productCounts[j];
+                                    }
                                 }
-                            }
-                        }
-                    }
-                }
-            }
-            for (int i = 1; i < factory.factorySystem.assemblerCursor; i++)
-            {
-                if (pool[i].id == i && pool[i].recipeId > 0 && pool[i].produced.Length == 1)
-                {
-                    for (int j = 0; j < pool[i].produced.Length; j++)
-                    {
-                        if (pool[i].produced[j] > 0)
-                        {
-                            int itemIndex = itemId2Index[pool[i].products[j]];
-                            if (servedQuota[itemIndex] > produced[itemIndex])
-                            {
-                                int count = Math.Min(pool[i].produced[j], servedQuota[itemIndex] - produced[itemIndex]);
-                                produced[itemIndex] += count;
-                                pool[i].produced[j] -= count;
-                            }
+                                break;
+                            case ERecipeType.Assemble:
+                                for (int j = 0; j < len; j++)
+                                {
+                                    if (pool[i].produced[j] > pool[i].productCounts[j] * 9
+                                        && buffer[itemId2Index[pool[i].products[j]]] < BUFFER_SIZE)
+                                    {
+                                        pool[i].produced[j] -= pool[i].productCounts[j];
+                                        buffer[itemId2Index[pool[i].products[j]]] += pool[i].productCounts[j];
+                                    }
+                                }
+                                break;
+                            default:
+                                for (int j = 0; j < len; j++)
+                                {
+                                    if (pool[i].produced[j] > pool[i].productCounts[j] * 19
+                                        && buffer[itemId2Index[pool[i].products[j]]] < BUFFER_SIZE)
+                                    {
+                                        pool[i].produced[j] -= pool[i].productCounts[j];
+                                        buffer[itemId2Index[pool[i].products[j]]] += pool[i].productCounts[j];
+                                    }
+                                }
+                                break;
                         }
                     }
                     for (int j = 0; j < pool[i].requireCounts.Length; j++)
@@ -165,10 +179,10 @@ namespace PlanetWormhole.Data
             }
         }
 
-        private void RegisterStation(PlanetFactory factory)
+        private void RegisterStation()
         {
-            StationComponent[] pool = factory.transport.stationPool;
-            for (int i = 1; i < factory.transport.stationCursor; i++)
+            StationComponent[] pool = tmpFactory.transport.stationPool;
+            for (int i = 1; i < tmpFactory.transport.stationCursor; i++)
             {
                 if (pool[i].id == i && pool[i].storage != null)
                 {
@@ -188,7 +202,7 @@ namespace PlanetWormhole.Data
                             }
                         }
                     }
-                    if (pool[i].needs[5] == Constants.WARPER && factory.gameData.history.TechUnlocked(Constants.SHIP_ENGINE_4))
+                    if (pool[i].needs[5] == Constants.WARPER && tmpFactory.gameData.history.TechUnlocked(Constants.SHIP_ENGINE_4))
                     {
                         servedQuota[itemId2Index[Constants.WARPER]] += _positive(pool[i].warperMaxCount - pool[i].warperCount);
                     }
@@ -196,14 +210,14 @@ namespace PlanetWormhole.Data
             }
         }
 
-        private void ConsumeStation(PlanetFactory factory)
+        private void ConsumeStation()
         {
-            StationComponent[] pool = factory.transport.stationPool;
-            for (int i = 1; i < factory.transport.stationCursor; i++)
+            StationComponent[] pool = tmpFactory.transport.stationPool;
+            for (int i = 1; i < tmpFactory.transport.stationCursor; i++)
             {
                 if (pool[i].id == i && pool[i].storage != null)
                 {
-                    if (pool[i].needs[5] == Constants.WARPER && factory.gameData.history.TechUnlocked(Constants.SHIP_ENGINE_4))
+                    if (pool[i].needs[5] == Constants.WARPER && tmpFactory.gameData.history.TechUnlocked(Constants.SHIP_ENGINE_4))
                     {
                         int warperIndex = itemId2Index[Constants.WARPER];
                         if (producedQuota[warperIndex] > served[warperIndex])
@@ -215,7 +229,7 @@ namespace PlanetWormhole.Data
                     }
                 }
             }
-            for (int i = 1; i < factory.transport.stationCursor; i++)
+            for (int i = 1; i < tmpFactory.transport.stationCursor; i++)
             {
                 if (pool[i].id == i && pool[i].storage != null)
                 {
@@ -251,14 +265,14 @@ namespace PlanetWormhole.Data
             }
         }
 
-        private void RegisterPowerSystem(PlanetFactory factory)
+        private void RegisterPowerSystem()
         {
-            PowerGeneratorComponent[] pool = factory.powerSystem.genPool;
-            for (int i = 1; i < factory.powerSystem.genCursor; i++)
+            PowerGeneratorComponent[] pool = tmpFactory.powerSystem.genPool;
+            for (int i = 1; i < tmpFactory.powerSystem.genCursor; i++)
             {
                 if (pool[i].id == i)
                 {
-                    if (pool[i].catalystId > 0 && factory.gameData.history.TechUnlocked(Constants.IONOSPHERIC_TECH))
+                    if (pool[i].catalystId > 0 && tmpFactory.gameData.history.TechUnlocked(Constants.IONOSPHERIC_TECH))
                     {
                         int count = _positive((72000 - pool[i].catalystPoint) / 3600);
                         sumSpray += count;
@@ -291,8 +305,8 @@ namespace PlanetWormhole.Data
                     }
                 }
             }
-            PowerExchangerComponent[] excPool = factory.powerSystem.excPool;
-            for (int i = 1; i < factory.powerSystem.excCursor; i++)
+            PowerExchangerComponent[] excPool = tmpFactory.powerSystem.excPool;
+            for (int i = 1; i < tmpFactory.powerSystem.excCursor; i++)
             {
                 if (excPool[i].id == i && excPool[i].fullId > 0 && excPool[i].emptyId > 0)
                 {
@@ -309,14 +323,14 @@ namespace PlanetWormhole.Data
             }
         }
 
-        private void ConsumePowerSystem(PlanetFactory factory)
+        private void ConsumePowerSystem()
         {
-            PowerGeneratorComponent[] pool = factory.powerSystem.genPool;
-            for (int i = 1; i < factory.powerSystem.genCursor; i++)
+            PowerGeneratorComponent[] pool = tmpFactory.powerSystem.genPool;
+            for (int i = 1; i < tmpFactory.powerSystem.genCursor; i++)
             {
                 if (pool[i].id == i)
                 {
-                    if (pool[i].catalystId > 0 && factory.gameData.history.TechUnlocked(Constants.IONOSPHERIC_TECH))
+                    if (pool[i].catalystId > 0 && tmpFactory.gameData.history.TechUnlocked(Constants.IONOSPHERIC_TECH))
                     {
                         int itemIndex = itemId2Index[pool[i].catalystId];
                         if (producedQuota[itemIndex] > served[itemIndex])
@@ -358,8 +372,8 @@ namespace PlanetWormhole.Data
                     }
                 }
             }
-            PowerExchangerComponent[] excPool = factory.powerSystem.excPool;
-            for (int i = 1; i < factory.powerSystem.excCursor; i++)
+            PowerExchangerComponent[] excPool = tmpFactory.powerSystem.excPool;
+            for (int i = 1; i < tmpFactory.powerSystem.excCursor; i++)
             {
                 if (excPool[i].id == i && excPool[i].fullId > 0 && excPool[i].emptyId > 0)
                 {
@@ -399,10 +413,10 @@ namespace PlanetWormhole.Data
             }
         }
 
-        private void RegisterMiner(PlanetFactory factory)
+        private void RegisterMiner()
         {
-            MinerComponent[] pool = factory.factorySystem.minerPool;
-            for (int i = 1; i < factory.factorySystem.minerCursor; i++)
+            MinerComponent[] pool = tmpFactory.factorySystem.minerPool;
+            for (int i = 1; i < tmpFactory.factorySystem.minerCursor; i++)
             {
                 if (pool[i].id == i)
                 {
@@ -414,10 +428,10 @@ namespace PlanetWormhole.Data
             }
         }
 
-        private void ConsumeMiner(PlanetFactory factory)
+        private void ConsumeMiner()
         {
-            MinerComponent[] pool = factory.factorySystem.minerPool;
-            for (int i = 1; i < factory.factorySystem.minerCursor; i++)
+            MinerComponent[] pool = tmpFactory.factorySystem.minerPool;
+            for (int i = 1; i < tmpFactory.factorySystem.minerCursor; i++)
             {
                 if (pool[i].id == i)
                 {
@@ -435,10 +449,10 @@ namespace PlanetWormhole.Data
             }
         }
 
-        private void RegisterLab(PlanetFactory factory)
+        private void RegisterLab()
         {
-            LabComponent[] pool = factory.factorySystem.labPool;
-            for (int i = 1; i < factory.factorySystem.labCursor; i++)
+            LabComponent[] pool = tmpFactory.factorySystem.labPool;
+            for (int i = 1; i < tmpFactory.factorySystem.labCursor; i++)
             {
                 if (pool[i].id == i && !pool[i].researchMode && pool[i].recipeId > 0)
                 {
@@ -475,10 +489,10 @@ namespace PlanetWormhole.Data
         }
         
 
-        private void ConsumeLab(PlanetFactory factory)
+        private void ConsumeLab()
         {
-            LabComponent[] pool = factory.factorySystem.labPool;
-            for (int i = 1; i < factory.factorySystem.labCursor; i++)
+            LabComponent[] pool = tmpFactory.factorySystem.labPool;
+            for (int i = 1; i < tmpFactory.factorySystem.labCursor; i++)
             {
                 if (pool[i].id == i && !pool[i].researchMode && pool[i].recipeId > 0)
                 {
@@ -538,10 +552,10 @@ namespace PlanetWormhole.Data
             }
         }
 
-        private void RegisterEjector(PlanetFactory factory)
+        private void RegisterEjector()
         {
-            EjectorComponent[] pool = factory.factorySystem.ejectorPool;
-            for (int i = 1; i < factory.factorySystem.ejectorCursor; i++)
+            EjectorComponent[] pool = tmpFactory.factorySystem.ejectorPool;
+            for (int i = 1; i < tmpFactory.factorySystem.ejectorCursor; i++)
             {
                 if (pool[i].id == i && pool[i].bulletId > 0)
                 {
@@ -552,10 +566,10 @@ namespace PlanetWormhole.Data
             }
         }
 
-        private void ConsumeEjector(PlanetFactory factory)
+        private void ConsumeEjector()
         {
-            EjectorComponent[] pool = factory.factorySystem.ejectorPool;
-            for (int i = 1; i < factory.factorySystem.ejectorCursor; i++)
+            EjectorComponent[] pool = tmpFactory.factorySystem.ejectorPool;
+            for (int i = 1; i < tmpFactory.factorySystem.ejectorCursor; i++)
             {
                 if (pool[i].id == i && pool[i].bulletId > 0)
                 {
@@ -575,10 +589,10 @@ namespace PlanetWormhole.Data
             }
         }
 
-        private void RegisterSilo(PlanetFactory factory)
+        private void RegisterSilo()
         {
-            SiloComponent[] pool = factory.factorySystem.siloPool;
-            for (int i = 1; i < factory.factorySystem.siloCursor; i++)
+            SiloComponent[] pool = tmpFactory.factorySystem.siloPool;
+            for (int i = 1; i < tmpFactory.factorySystem.siloCursor; i++)
             {
                 if (pool[i].id == i && pool[i].bulletId > 0)
                 {
@@ -589,10 +603,10 @@ namespace PlanetWormhole.Data
             }
         }
 
-        private void ConsumeSilo(PlanetFactory factory)
+        private void ConsumeSilo()
         {
-            SiloComponent[] pool = factory.factorySystem.siloPool;
-            for (int i = 1; i < factory.factorySystem.siloCursor; i++)
+            SiloComponent[] pool = tmpFactory.factorySystem.siloPool;
+            for (int i = 1; i < tmpFactory.factorySystem.siloCursor; i++)
             {
                 if (pool[i].id == i && pool[i].bulletId > 0)
                 {
@@ -612,10 +626,10 @@ namespace PlanetWormhole.Data
             }
         }
 
-        private void RegisterStorage(PlanetFactory factory)
+        private void RegisterStorage()
         {
-            StorageComponent[] storagePool = factory.factoryStorage.storagePool;
-            for (int i = 1; i < factory.factoryStorage.storageCursor; i++)
+            StorageComponent[] storagePool = tmpFactory.factoryStorage.storagePool;
+            for (int i = 1; i < tmpFactory.factoryStorage.storageCursor; i++)
             {
                 if (storagePool[i] != null && storagePool[i].id == i)
                 {
@@ -632,8 +646,8 @@ namespace PlanetWormhole.Data
                     }
                 }
             }
-            TankComponent[] tankPool = factory.factoryStorage.tankPool;
-            for (int i = 1; i < factory.factoryStorage.tankCursor; i++)
+            TankComponent[] tankPool = tmpFactory.factoryStorage.tankPool;
+            for (int i = 1; i < tmpFactory.factoryStorage.tankCursor; i++)
             {
                 if (tankPool[i].id == i)
                 {
@@ -645,10 +659,10 @@ namespace PlanetWormhole.Data
             }
         }
 
-        private void ConsumeStorage(PlanetFactory factory)
+        private void ConsumeStorage()
         {
-            StorageComponent[] storagePool = factory.factoryStorage.storagePool;
-            for (int i = 1; i < factory.factoryStorage.storageCursor; i++)
+            StorageComponent[] storagePool = tmpFactory.factoryStorage.storagePool;
+            for (int i = 1; i < tmpFactory.factoryStorage.storageCursor; i++)
             {
                 if (storagePool[i] != null && storagePool[i].id == i)
                 {
@@ -689,8 +703,8 @@ namespace PlanetWormhole.Data
                     }
                 }
             }
-            TankComponent[] tankPool = factory.factoryStorage.tankPool;
-            for (int i = 1; i < factory.factoryStorage.tankCursor; i++)
+            TankComponent[] tankPool = tmpFactory.factoryStorage.tankPool;
+            for (int i = 1; i < tmpFactory.factoryStorage.tankCursor; i++)
             {
                 if (tankPool[i].id == i)
                 {
@@ -717,6 +731,45 @@ namespace PlanetWormhole.Data
             }
         }
 
+        private void RegisterTrash()
+        {
+            TrashContainer container = tmpFactory.gameData.trashSystem.container;
+            TrashObject[] trashObjs = container.trashObjPool;
+            for (int i = 0; i < container.trashCursor; i++)
+            {
+                if (trashObjs[i].item > 0)
+                {
+                    producedQuota[itemId2Index[trashObjs[i].item]] += trashObjs[i].count;
+                }
+            }
+        }
+
+        private void ConsumeTrash()
+        {
+            TrashContainer container = tmpFactory.gameData.trashSystem.container;
+            TrashObject[] trashObjs = container.trashObjPool;
+            for (int i = 0; i < container.trashCursor; i++)
+            {
+                if (trashObjs[i].item > 0)
+                {
+                    int itemIndex = itemId2Index[trashObjs[i].item];
+                    if (servedQuota[itemIndex] > produced[itemIndex])
+                    {
+                        int count = Math.Min(trashObjs[i].count, servedQuota[itemIndex] - produced[itemIndex]);
+                        produced[itemIndex] += count;
+                        trashObjs[i].count -= count;
+                        int incAdd = _split_inc(trashObjs[i].inc, count);
+                        inc += incAdd;
+                        trashObjs[i].inc -= incAdd;
+                        if (trashObjs[i].count <= 0)
+                        {
+                            container.RemoveTrash(i);
+                        }
+                    }
+                }
+            }
+        }
+
         private void Spray()
         {
             if (inc < sumSpray)
@@ -728,11 +781,25 @@ namespace PlanetWormhole.Data
                     inc += count * (INC_SPRAY_TIMES + EXTRA_INC_SPRAY_TIMES - 1);
                     servedQuota[PROLIF_MK3_INDEX] += count;
                     served[PROLIF_MK3_INDEX] += count;
+                    consumedProliferator = count;
                 }
             }
             if (inc < 1)
             {
                 spray = false;
+            }
+        }
+
+        private void ConsumeBuffer()
+        {
+            for (int i = 0; i < N; i++)
+            {
+                if (servedQuota[i] > produced[i] && buffer[i] > 0)
+                {
+                    int count = Math.Min(buffer[i], servedQuota[i] - produced[i]);
+                    produced[i] += count;
+                    buffer[i] -= count;
+                }
             }
         }
 

@@ -20,6 +20,11 @@ Automatically transfer cargos within a planet. You do not need planetary logisti
 
 ## ChangeLog
 
+### 1.0.4
+
+Get cargo from trash.
+Add internal product buffer to avoid factories with multiple products got stucked.
+
 ### 1.0.3
 
 Do not get cargo from requirement slot
