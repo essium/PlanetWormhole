@@ -184,7 +184,7 @@ namespace PlanetWormhole.Data
             StationComponent[] pool = tmpFactory.transport.stationPool;
             for (int i = 1; i < tmpFactory.transport.stationCursor; i++)
             {
-                if (pool[i].id == i && pool[i].storage != null)
+                if (pool[i] != null && pool[i].id == i && pool[i].storage != null)
                 {
                     StationStore[] storage = pool[i].storage;
                     for (int j = 0; j < storage.Length; j++)
@@ -215,7 +215,7 @@ namespace PlanetWormhole.Data
             StationComponent[] pool = tmpFactory.transport.stationPool;
             for (int i = 1; i < tmpFactory.transport.stationCursor; i++)
             {
-                if (pool[i].id == i && pool[i].storage != null)
+                if (pool[i] != null && pool[i].id == i && pool[i].storage != null)
                 {
                     if (pool[i].needs[5] == Constants.WARPER && tmpFactory.gameData.history.TechUnlocked(Constants.SHIP_ENGINE_4))
                     {
@@ -231,7 +231,7 @@ namespace PlanetWormhole.Data
             }
             for (int i = 1; i < tmpFactory.transport.stationCursor; i++)
             {
-                if (pool[i].id == i && pool[i].storage != null)
+                if (pool[i] != null && pool[i].id == i && pool[i].storage != null)
                 {
                     StationStore[] storage = pool[i].storage;
                     for (int j = 0; j < storage.Length; j++)

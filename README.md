@@ -20,6 +20,10 @@ Automatically transfer cargos within a planet. You do not need planetary logisti
 
 ## ChangeLog
 
+### 1.0.5
+
+Fix exception when remove a station.
+
 ### 1.0.4
 
 Get cargo from trash.
