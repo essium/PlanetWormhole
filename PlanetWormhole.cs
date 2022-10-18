@@ -4,6 +4,8 @@ using BepInEx.Logging;
 using HarmonyLib;
 using PlanetWormhole.Data;
 using System.Collections.Generic;
+using System.Threading;
+using static PlanetWormhole.Constants;
 
 namespace PlanetWormhole
 {
@@ -14,14 +16,13 @@ namespace PlanetWormhole
         private const string plugin = "PlanetWormhole";
         private const string version = "1.0.5";
 
-        private static ConfigEntry<bool> enable;
-        private static List<Wormhole> wormholes;
+        private static List<PlanetThreadObject> planetWormhole;
+        private static Wormhole globalWormhole;
         private static ManualLogSource logger;
 
         private Harmony harmony;
         public void Start()
         {
-            enable = Config.Bind("Config", "Enable", true, "whether enable plugin");
             harmony = new Harmony(package + ":" + version);
             harmony.PatchAll(typeof(PlanetWormhole));
         }
@@ -33,43 +34,35 @@ namespace PlanetWormhole
         }
 
         [HarmonyPostfix, HarmonyPatch(typeof(GameData), "GameTick")]
-        private static void _patch_GameData_GameTick(PlanetFactory __instance,
-            long time,
-            ref int ___factoryCount,
-            ref PlanetFactory[] ___factories)
+        private static void _postfix_GameData_GameTick(GameData __instance,
+            long time)
         {
-            if (!enable.Value)
+            if (GameMain.isPaused)
             {
                 return;
             }
-            while(wormholes.Count < ___factoryCount)
+            while(planetWormhole.Count < __instance.factoryCount)
             {
-                wormholes.Add(new Wormhole());
+                planetWormhole.Add(new PlanetThreadObject());
             }
-            for (int i = 0; i < ___factoryCount; i++)
+            for (int i = 0; i < __instance.factoryCount; i++)
             {
-                if (time % 30 == i % 30)
-                {
-                    wormholes[i].Patch(___factories[i]);
-                }
+                planetWormhole[i].SetFactory(__instance.factories[i]);
+                ThreadPool.QueueUserWorkItem(Wormhole.PatchPlanet, planetWormhole[i]);
             }
         }
         [HarmonyPrefix, HarmonyPatch(typeof(ProductionStatistics), "GameTick")]
-        private static void _patch_ProductionStatistics_GameTick(ProductionStatistics __instance,
+        private static void _postfix_ProductionStatistics_GameTick(ProductionStatistics __instance,
             long time)
         {
-            if (!enable.Value)
-            {
-                return;
-            }
             for (int i = 0; i < __instance.gameData.factoryCount; i++)
             {
-                if (time % 30 == (i + 1) % 30 && wormholes.Count > i)
+                if (planetWormhole.Count > i)
                 {
-                    if (wormholes[i].consumedProliferator > 0)
+                    if (planetWormhole[i].wormhole.consumedProliferator > 0)
                     {
-                        __instance.factoryStatPool[i].consumeRegister[Constants.PROLIFERATOR_MK3] += wormholes[i].consumedProliferator;
-                        wormholes[i].consumedProliferator = 0;
+                        __instance.factoryStatPool[i].consumeRegister[PROLIFERATOR_MK3] += planetWormhole[i].wormhole.consumedProliferator;
+                        planetWormhole[i].wormhole.consumedProliferator = 0;
                     }
                 }
             }
@@ -78,7 +71,8 @@ namespace PlanetWormhole
         static PlanetWormhole()
         {
             logger = BepInEx.Logging.Logger.CreateLogSource(plugin);
-            wormholes = new List<Wormhole>();
+            planetWormhole = new List<PlanetThreadObject>();
+            globalWormhole = new Wormhole();
         }
 
         public static void LogInfo(string msg)

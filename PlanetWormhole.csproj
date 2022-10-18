@@ -62,6 +62,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Constants.cs" />
+    <Compile Include="Data\PlanetThreadObject.cs" />
     <Compile Include="Data\Wormhole.cs" />
     <Compile Include="PlanetWormhole.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

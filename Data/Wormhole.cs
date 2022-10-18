@@ -1,17 +1,13 @@
 ﻿using System;
-using System.Collections.Generic;
+using static PlanetWormhole.Constants;
 
 namespace PlanetWormhole.Data
 {
     internal class Wormhole
     {
-        private static Dictionary<int, int> itemId2Index;
-        private static int N;
-        private static int PROLIF_MK3_INDEX;
         private static int INC_SPRAY_TIMES;
         private static int INC_ABILITY;
         private static int EXTRA_INC_SPRAY_TIMES;
-        private const int BUFFER_SIZE = 1000;
         private int[] producedQuota;
         private int[] servedQuota;
         private int[] produced;
@@ -25,46 +21,62 @@ namespace PlanetWormhole.Data
 
         public Wormhole()
         {
-            producedQuota = new int[N];
-            servedQuota = new int[N];
-            produced = new int[N];
-            served = new int[N];
-            buffer = new int[N];
-            Array.Clear(buffer, 0, N);
+            producedQuota = new int[MAX_ITEM_COUNT];
+            servedQuota = new int[MAX_ITEM_COUNT];
+            produced = new int[MAX_ITEM_COUNT];
+            served = new int[MAX_ITEM_COUNT];
+            buffer = new int[MAX_ITEM_COUNT];
+            Array.Clear(buffer, 0, MAX_ITEM_COUNT);
             inc = 0;
         }
-        public void Patch(PlanetFactory factory)
+        public static void PatchPlanet(Object obj)
         {
-            tmpFactory = factory;
+            PlanetThreadObject pto = (PlanetThreadObject)obj;
+            Wormhole wormhole = pto.wormhole;
+            PlanetFactory factory = pto.factory;
+            wormhole.tmpFactory = factory;
+            wormhole.Reset();
+            wormhole.RegisterTrash();
+            wormhole.RegisterPowerSystem();
+            wormhole.RegisterMiner();
+            wormhole.RegisterAssembler();
+            wormhole.RegisterFractionator();
+            wormhole.RegisterLab();
+            wormhole.RegisterEjector();
+            wormhole.RegisterSilo();
+            wormhole.RegisterStorage();
+            wormhole.RegisterStation();
+            wormhole.Spray();
+            wormhole.ConsumeBuffer();
+            wormhole.ConsumeTrash();
+            wormhole.ConsumeStorage();
+            wormhole.ConsumePowerSystem();
+            wormhole.ConsumeMiner();
+            wormhole.ConsumeAssembler();
+            wormhole.ConsumeFractionator();
+            wormhole.ConsumeLab();
+            wormhole.ConsumeEjector();
+            wormhole.ConsumeSilo();
+            wormhole.ConsumeStation();
+        }
+
+        public void PatchGlobal(GameData gameData)
+        {
             Reset();
-            RegisterTrash();
-            RegisterPowerSystem();
-            RegisterMiner();
-            RegisterAssembler();
-            RegisterLab();
-            RegisterEjector();
-            RegisterSilo();
-            RegisterStorage();
-            RegisterStation();
-            Spray();
-            ConsumeBuffer();
-            ConsumeTrash();
-            ConsumeStorage();
-            ConsumePowerSystem();
-            ConsumeMiner();
-            ConsumeAssembler();
-            ConsumeLab();
-            ConsumeEjector();
-            ConsumeSilo();
-            ConsumeStation();
+            for (int i = 0; i < gameData.factoryCount; i++)
+            {
+                tmpFactory = gameData.factories[i];
+                RegisterTrash();
+                RegisterStorage();
+            }
         }
 
         private void Reset()
         {
-            Array.Clear(producedQuota, 0, N);
-            Array.Clear(servedQuota, 0, N);
-            Array.Clear(produced, 0, N);
-            Array.Clear(served, 0, N);
+            Array.Clear(producedQuota, 0, MAX_ITEM_COUNT);
+            Array.Clear(servedQuota, 0, MAX_ITEM_COUNT);
+            Array.Clear(produced, 0, MAX_ITEM_COUNT);
+            Array.Clear(served, 0, MAX_ITEM_COUNT);
             spray = true;
             sumSpray = 0;
             consumedProliferator = 0;
@@ -81,7 +93,7 @@ namespace PlanetWormhole.Data
                     {
                         if (pool[i].produced[j] > 0)
                         {
-                            producedQuota[itemId2Index[pool[i].products[j]]] += pool[i].produced[j];
+                            producedQuota[pool[i].products[j]] += pool[i].produced[j];
                         }
                     }
                     for (int j = 0; j < pool[i].requireCounts.Length; j++)
@@ -90,7 +102,7 @@ namespace PlanetWormhole.Data
                         {
                             int count = _positive(3 * pool[i].requireCounts[j] - pool[i].served[j]);
                             sumSpray += count;
-                            servedQuota[itemId2Index[pool[i].needs[j]]] += count;
+                            servedQuota[pool[i].needs[j]] += count;
                         }
                     }
                 }
@@ -108,11 +120,11 @@ namespace PlanetWormhole.Data
                     {
                         if (pool[i].produced[j] > 0)
                         {
-                            int itemIndex = itemId2Index[pool[i].products[j]];
-                            if (servedQuota[itemIndex] > produced[itemIndex])
+                            int itemId = pool[i].products[j];
+                            if (servedQuota[itemId] > produced[itemId])
                             {
-                                int count = Math.Min(pool[i].produced[j], servedQuota[itemIndex] - produced[itemIndex]);
-                                produced[itemIndex] += count;
+                                int count = Math.Min(pool[i].produced[j], servedQuota[itemId] - produced[itemId]);
+                                produced[itemId] += count;
                                 pool[i].produced[j] -= count;
                             }
                         }
@@ -126,10 +138,10 @@ namespace PlanetWormhole.Data
                                 for (int j = 0; j < len; j++)
                                 {
                                     if (pool[i].produced[j] + pool[i].productCounts[j] > 100
-                                        && buffer[itemId2Index[pool[i].products[j]]] < BUFFER_SIZE)
+                                        && buffer[pool[i].products[j]] < BUFFER_SIZE)
                                     {
                                         pool[i].produced[j] -= pool[i].productCounts[j];
-                                        buffer[itemId2Index[pool[i].products[j]]] += pool[i].productCounts[j];
+                                        buffer[pool[i].products[j]] += pool[i].productCounts[j];
                                     }
                                 }
                                 break;
@@ -137,10 +149,10 @@ namespace PlanetWormhole.Data
                                 for (int j = 0; j < len; j++)
                                 {
                                     if (pool[i].produced[j] > pool[i].productCounts[j] * 9
-                                        && buffer[itemId2Index[pool[i].products[j]]] < BUFFER_SIZE)
+                                        && buffer[pool[i].products[j]] < BUFFER_SIZE)
                                     {
                                         pool[i].produced[j] -= pool[i].productCounts[j];
-                                        buffer[itemId2Index[pool[i].products[j]]] += pool[i].productCounts[j];
+                                        buffer[pool[i].products[j]] += pool[i].productCounts[j];
                                     }
                                 }
                                 break;
@@ -148,10 +160,10 @@ namespace PlanetWormhole.Data
                                 for (int j = 0; j < len; j++)
                                 {
                                     if (pool[i].produced[j] > pool[i].productCounts[j] * 19
-                                        && buffer[itemId2Index[pool[i].products[j]]] < BUFFER_SIZE)
+                                        && buffer[pool[i].products[j]] < BUFFER_SIZE)
                                     {
                                         pool[i].produced[j] -= pool[i].productCounts[j];
-                                        buffer[itemId2Index[pool[i].products[j]]] += pool[i].productCounts[j];
+                                        buffer[pool[i].products[j]] += pool[i].productCounts[j];
                                     }
                                 }
                                 break;
@@ -161,15 +173,15 @@ namespace PlanetWormhole.Data
                     {
                         if (pool[i].needs[j] > 0)
                         {
-                            int itemIndex = itemId2Index[pool[i].needs[j]];
-                            if (producedQuota[itemIndex] > served[itemIndex])
+                            int itemId = pool[i].needs[j];
+                            if (producedQuota[itemId] > served[itemId])
                             {
-                                int count = _positive(Math.Min(3 * pool[i].requireCounts[j] - pool[i].served[j], producedQuota[itemIndex] - served[itemIndex]));
-                                served[itemIndex] += count;
+                                int count = _positive(Math.Min(3 * pool[i].requireCounts[j] - pool[i].served[j], producedQuota[itemId] - served[itemId]));
+                                served[itemId] += count;
                                 pool[i].served[j] += count;
                                 if (spray)
                                 {
-                                    inc -= count;
+                                    inc -= count * INC_ABILITY;
                                     pool[i].incServed[j] += INC_ABILITY * count;
                                 }
                             }
@@ -193,18 +205,18 @@ namespace PlanetWormhole.Data
                         {
                             if (storage[j].localLogic == ELogisticStorage.Supply)
                             {
-                                producedQuota[itemId2Index[storage[j].itemId]] += storage[j].count;
+                                producedQuota[storage[j].itemId] += storage[j].count;
                             }
                             else if (storage[j].localLogic == ELogisticStorage.Demand)
                             {
                                 int count = _positive(storage[j].max - storage[j].count);
-                                servedQuota[itemId2Index[storage[j].itemId]] += count;
+                                servedQuota[storage[j].itemId] += count;
                             }
                         }
                     }
-                    if (pool[i].needs[5] == Constants.WARPER && tmpFactory.gameData.history.TechUnlocked(Constants.SHIP_ENGINE_4))
+                    if (pool[i].needs[5] == Constants.WARPER && tmpFactory.gameData.history.TechUnlocked(SHIP_ENGINE_4))
                     {
-                        servedQuota[itemId2Index[Constants.WARPER]] += _positive(pool[i].warperMaxCount - pool[i].warperCount);
+                        servedQuota[WARPER] += _positive(pool[i].warperMaxCount - pool[i].warperCount);
                     }
                 }
             }
@@ -217,13 +229,12 @@ namespace PlanetWormhole.Data
             {
                 if (pool[i] != null && pool[i].id == i && pool[i].storage != null)
                 {
-                    if (pool[i].needs[5] == Constants.WARPER && tmpFactory.gameData.history.TechUnlocked(Constants.SHIP_ENGINE_4))
+                    if (pool[i].needs[5] == Constants.WARPER && tmpFactory.gameData.history.TechUnlocked(SHIP_ENGINE_4))
                     {
-                        int warperIndex = itemId2Index[Constants.WARPER];
-                        if (producedQuota[warperIndex] > served[warperIndex])
+                        if (producedQuota[WARPER] > served[WARPER])
                         {
-                            int count = _positive(Math.Min(pool[i].warperMaxCount - pool[i].warperCount, producedQuota[warperIndex] - served[warperIndex]));
-                            served[warperIndex] += count;
+                            int count = _positive(Math.Min(pool[i].warperMaxCount - pool[i].warperCount, producedQuota[WARPER] - served[WARPER]));
+                            served[WARPER] += count;
                             pool[i].warperCount += count;
                         }
                     }
@@ -238,13 +249,13 @@ namespace PlanetWormhole.Data
                     {
                         if (storage[j].itemId > 0)
                         {
-                            int itemIndex = itemId2Index[storage[j].itemId];
+                            int itemId = storage[j].itemId;
                             if (storage[j].localLogic == ELogisticStorage.Supply)
                             {
-                                if (servedQuota[itemIndex] > produced[itemIndex])
+                                if (servedQuota[itemId] > produced[itemId])
                                 {
-                                    int count = Math.Min(storage[j].count, servedQuota[itemIndex] - produced[itemIndex]);
-                                    produced[itemIndex] += count;
+                                    int count = Math.Min(storage[j].count, servedQuota[itemId] - produced[itemId]);
+                                    produced[itemId] += count;
                                     storage[j].count -= count;
                                     int incAdd = _split_inc(storage[j].inc, count);
                                     storage[j].inc -= incAdd;
@@ -252,10 +263,10 @@ namespace PlanetWormhole.Data
                                 }
                             } else if (storage[j].localLogic == ELogisticStorage.Demand)
                             {
-                                if (producedQuota[itemIndex] > served[itemIndex])
+                                if (producedQuota[itemId] > served[itemId])
                                 {
-                                    int count = _positive(Math.Min(producedQuota[itemIndex] - served[itemIndex], storage[j].max - storage[j].count));
-                                    served[itemIndex] += count;
+                                    int count = _positive(Math.Min(producedQuota[itemId] - served[itemId], storage[j].max - storage[j].count));
+                                    served[itemId] += count;
                                     storage[j].count += count;
                                 }
                             }
@@ -272,14 +283,14 @@ namespace PlanetWormhole.Data
             {
                 if (pool[i].id == i)
                 {
-                    if (pool[i].catalystId > 0 && tmpFactory.gameData.history.TechUnlocked(Constants.IONOSPHERIC_TECH))
+                    if (pool[i].catalystId > 0 && tmpFactory.gameData.history.TechUnlocked(IONOSPHERIC_TECH))
                     {
                         int count = _positive((72000 - pool[i].catalystPoint) / 3600);
                         sumSpray += count;
-                        servedQuota[itemId2Index[pool[i].catalystId]] += count;
+                        servedQuota[pool[i].catalystId] += count;
                         if (pool[i].productId > 0)
                         {
-                            producedQuota[itemId2Index[pool[i].productId]] += (int) pool[i].productCount;
+                            producedQuota[pool[i].productId] += (int) pool[i].productCount;
                         }
                     }
                     int[] fuelNeeds = ItemProto.fuelNeeds[pool[i].fuelMask];
@@ -301,7 +312,7 @@ namespace PlanetWormhole.Data
                         }
                         int count = _positive(10 - pool[i].fuelCount);
                         sumSpray += count;
-                        servedQuota[itemId2Index[itemId]] += count;
+                        servedQuota[itemId] += count;
                     }
                 }
             }
@@ -312,12 +323,12 @@ namespace PlanetWormhole.Data
                 {
                     if (_float_equal(excPool[i].targetState, 1.0f))
                     {
-                        producedQuota[itemId2Index[excPool[i].fullId]] += excPool[i].fullCount;
-                        servedQuota[itemId2Index[excPool[i].emptyId]] += _positive(PowerExchangerComponent.maxCount - excPool[i].emptyCount);
+                        producedQuota[excPool[i].fullId] += excPool[i].fullCount;
+                        servedQuota[excPool[i].emptyId] += _positive(PowerExchangerComponent.maxCount - excPool[i].emptyCount);
                     } else if (_float_equal(excPool[i].targetState, -1.0f))
                     {
-                        producedQuota[itemId2Index[excPool[i].fullId]] += excPool[i].emptyCount;
-                        servedQuota[itemId2Index[excPool[i].emptyId]] += _positive(PowerExchangerComponent.maxCount - excPool[i].fullCount);
+                        producedQuota[excPool[i].fullId] += excPool[i].emptyCount;
+                        servedQuota[excPool[i].emptyId] += _positive(PowerExchangerComponent.maxCount - excPool[i].fullCount);
                     }
                 }
             }
@@ -332,40 +343,40 @@ namespace PlanetWormhole.Data
                 {
                     if (pool[i].catalystId > 0 && tmpFactory.gameData.history.TechUnlocked(Constants.IONOSPHERIC_TECH))
                     {
-                        int itemIndex = itemId2Index[pool[i].catalystId];
-                        if (producedQuota[itemIndex] > served[itemIndex])
+                        int itemId = pool[i].catalystId;
+                        if (producedQuota[itemId] > served[itemId])
                         {
-                            int count = _positive(Math.Min((72000 - pool[i].catalystPoint) / 3600, producedQuota[itemIndex] - served[itemIndex]));
-                            served[itemIndex] += count;
+                            int count = _positive(Math.Min((72000 - pool[i].catalystPoint) / 3600, producedQuota[itemId] - served[itemId]));
+                            served[itemId] += count;
                             pool[i].catalystPoint += count * 3600;
                             if (spray)
                             {
-                                inc -= count;
+                                inc -= count * INC_ABILITY;
                                 pool[i].catalystIncPoint += count * 3600 * INC_ABILITY;
                             }
                         }
                         if (pool[i].productId > 0)
                         {
-                            itemIndex = itemId2Index[pool[i].productId];
-                            if (servedQuota[itemIndex] > produced[itemIndex])
+                            itemId = pool[i].productId;
+                            if (servedQuota[itemId] > produced[itemId])
                             {
-                                int count = Math.Min((int)pool[i].productCount, servedQuota[itemIndex] - produced[itemIndex]);
-                                produced[itemIndex] += count;
+                                int count = Math.Min((int)pool[i].productCount, servedQuota[itemId] - produced[itemId]);
+                                produced[itemId] += count;
                                 pool[i].productCount -= count;
                             }
                         }
                     }
                     if (pool[i].fuelId > 0)
                     {
-                        int itemIndex = itemId2Index[pool[i].fuelId];
-                        if (producedQuota[itemIndex] > served[itemIndex])
+                        int itemId = pool[i].fuelId;
+                        if (producedQuota[itemId] > served[itemId])
                         {
-                            int count = _positive(Math.Min(10 - pool[i].fuelCount, producedQuota[itemIndex] - served[itemIndex]));
-                            served[itemIndex] += count;
+                            int count = _positive(Math.Min(10 - pool[i].fuelCount, producedQuota[itemId] - served[itemId]));
+                            served[itemId] += count;
                             pool[i].fuelCount += (short) count;
                             if (spray)
                             {
-                                inc -= count;
+                                inc -= count * INC_ABILITY;
                                 pool[i].fuelInc += (short) (INC_ABILITY * count);
                             }
                         }
@@ -377,8 +388,8 @@ namespace PlanetWormhole.Data
             {
                 if (excPool[i].id == i && excPool[i].fullId > 0 && excPool[i].emptyId > 0)
                 {
-                    int fullIndex = itemId2Index[excPool[i].fullId];
-                    int emptyIndex = itemId2Index[excPool[i].emptyId];
+                    int fullIndex = excPool[i].fullId;
+                    int emptyIndex = excPool[i].emptyId;
                     if (_float_equal(excPool[i].targetState, 1.0f))
                     {
                         if (servedQuota[fullIndex] > produced[fullIndex])
@@ -422,7 +433,7 @@ namespace PlanetWormhole.Data
                 {
                     if (pool[i].productId > 0)
                     {
-                        producedQuota[itemId2Index[pool[i].productId]] += pool[i].productCount;
+                        producedQuota[pool[i].productId] += pool[i].productCount;
                     }
                 }
             }
@@ -437,11 +448,11 @@ namespace PlanetWormhole.Data
                 {
                     if (pool[i].productId > 0)
                     {
-                        int itemIndex = itemId2Index[pool[i].productId];
-                        if (servedQuota[itemIndex] > produced[itemIndex])
+                        int itemId = pool[i].productId;
+                        if (servedQuota[itemId] > produced[itemId])
                         {
-                            int count = Math.Min(pool[i].productCount, servedQuota[itemIndex] - produced[itemIndex]);
-                            produced[itemIndex] += count;
+                            int count = Math.Min(pool[i].productCount, servedQuota[itemId] - produced[itemId]);
+                            produced[itemId] += count;
                             pool[i].productCount -= count;
                         }
                     }
@@ -460,7 +471,7 @@ namespace PlanetWormhole.Data
                     {
                         for (int j = 0; j < pool[i].productCounts.Length; j++)
                         {
-                            producedQuota[itemId2Index[pool[i].products[j]]] += pool[i].produced[j];
+                            producedQuota[pool[i].products[j]] += pool[i].produced[j];
                         }
                     }
                     for (int j = 0; j < pool[i].needs.Length; j++)
@@ -469,7 +480,7 @@ namespace PlanetWormhole.Data
                         {
                             int count = _positive(4 - pool[i].served[j]);
                             sumSpray += count;
-                            servedQuota[itemId2Index[pool[i].needs[j]]] += count;
+                            servedQuota[pool[i].needs[j]] += count;
                         }
                     }
                 }
@@ -481,7 +492,7 @@ namespace PlanetWormhole.Data
                         {
                             int count = _positive((36000 - pool[i].matrixServed[j]) / 3600);
                             sumSpray += count;
-                            servedQuota[itemId2Index[pool[i].needs[j]]] += count;
+                            servedQuota[pool[i].needs[j]] += count;
                         }
                     }
                 }
@@ -500,11 +511,11 @@ namespace PlanetWormhole.Data
                     {
                         for (int j = 0; j < pool[i].productCounts.Length; j++)
                         {
-                            int itemIndex = itemId2Index[pool[i].products[j]];
-                            if (servedQuota[itemIndex] > produced[itemIndex])
+                            int itemId = pool[i].products[j];
+                            if (servedQuota[itemId] > produced[itemId])
                             {
-                                int count = Math.Min(pool[i].produced[j], servedQuota[itemIndex] - produced[itemIndex]);
-                                produced[itemIndex] += count;
+                                int count = Math.Min(pool[i].produced[j], servedQuota[itemId] - produced[itemId]);
+                                produced[itemId] += count;
                                 pool[i].produced[j] -= count;
                             }
                         }
@@ -513,15 +524,15 @@ namespace PlanetWormhole.Data
                     {
                         if (pool[i].needs[j] > 0)
                         {
-                            int itemIndex = itemId2Index[pool[i].needs[j]];
-                            if (producedQuota[itemIndex] > served[itemIndex])
+                            int itemId = pool[i].needs[j];
+                            if (producedQuota[itemId] > served[itemId])
                             {
-                                int count = _positive(Math.Min(4 - pool[i].served[j], producedQuota[itemIndex] - served[itemIndex]));
-                                served[itemIndex] += count;
+                                int count = _positive(Math.Min(4 - pool[i].served[j], producedQuota[itemId] - served[itemId]));
+                                served[itemId] += count;
                                 pool[i].served[j] += count;
                                 if (spray)
                                 {
-                                    inc -= count;
+                                    inc -= count * INC_ABILITY;
                                     pool[i].incServed[j] += INC_ABILITY * count;
                                 }
                             }
@@ -534,15 +545,15 @@ namespace PlanetWormhole.Data
                     {
                         if (pool[i].needs[j] > 0)
                         {
-                            int itemIndex = itemId2Index[pool[i].needs[j]];
-                            if (producedQuota[itemIndex] > served[itemIndex])
+                            int itemId = pool[i].needs[j];
+                            if (producedQuota[itemId] > served[itemId])
                             {
-                                int count = _positive(Math.Min((36000 - pool[i].matrixServed[j]) / 3600, producedQuota[itemIndex] - served[itemIndex]));
-                                served[itemIndex] += count;
+                                int count = _positive(Math.Min((36000 - pool[i].matrixServed[j]) / 3600, producedQuota[itemId] - served[itemId]));
+                                served[itemId] += count;
                                 pool[i].matrixServed[j] += count * 3600;
                                 if (spray)
                                 {
-                                    inc -= count;
+                                    inc -= count * INC_ABILITY ;
                                     pool[i].matrixIncServed[j] += INC_ABILITY * count * 3600;
                                 }
                             }
@@ -561,7 +572,7 @@ namespace PlanetWormhole.Data
                 {
                     int count = _positive(20 - pool[i].bulletCount);
                     sumSpray += count;
-                    servedQuota[itemId2Index[pool[i].bulletId]] += count;
+                    servedQuota[pool[i].bulletId] += count;
                 }
             }
         }
@@ -573,15 +584,15 @@ namespace PlanetWormhole.Data
             {
                 if (pool[i].id == i && pool[i].bulletId > 0)
                 {
-                    int itemIndex = itemId2Index[pool[i].bulletId];
-                    if (producedQuota[itemIndex] > served[itemIndex])
+                    int itemId = pool[i].bulletId;
+                    if (producedQuota[itemId] > served[itemId])
                     {
-                        int count = _positive(Math.Min(20 - pool[i].bulletCount, producedQuota[itemIndex] - served[itemIndex]));
-                        served[itemIndex] += count;
+                        int count = _positive(Math.Min(20 - pool[i].bulletCount, producedQuota[itemId] - served[itemId]));
+                        served[itemId] += count;
                         pool[i].bulletCount += count;
                         if (spray)
                         {
-                            inc -= count;
+                            inc -= count * INC_ABILITY;
                             pool[i].bulletInc += INC_ABILITY * count;
                         }
                     }
@@ -598,7 +609,7 @@ namespace PlanetWormhole.Data
                 {
                     int count = _positive(20 - pool[i].bulletCount);
                     sumSpray += count;
-                    servedQuota[itemId2Index[pool[i].bulletId]] += count;
+                    servedQuota[pool[i].bulletId] += count;
                 }
             }
         }
@@ -610,15 +621,15 @@ namespace PlanetWormhole.Data
             {
                 if (pool[i].id == i && pool[i].bulletId > 0)
                 {
-                    int itemIndex = itemId2Index[pool[i].bulletId];
-                    if (producedQuota[itemIndex] > served[itemIndex])
+                    int itemId = pool[i].bulletId;
+                    if (producedQuota[itemId] > served[itemId])
                     {
-                        int count = _positive(Math.Min(20 - pool[i].bulletCount, producedQuota[itemIndex] - served[itemIndex]));
-                        served[itemIndex] += count;
+                        int count = _positive(Math.Min(20 - pool[i].bulletCount, producedQuota[itemId] - served[itemId]));
+                        served[itemId] += count;
                         pool[i].bulletCount += count;
                         if (spray)
                         {
-                            inc -= count;
+                            inc -= count * INC_ABILITY;
                             pool[i].bulletInc += INC_ABILITY * count;
                         }
                     }
@@ -641,7 +652,7 @@ namespace PlanetWormhole.Data
                     {
                         if (storagePool[i].grids[j].itemId > 0)
                         {
-                            producedQuota[itemId2Index[storagePool[i].grids[j].itemId]] += storagePool[i].grids[j].count;
+                            producedQuota[storagePool[i].grids[j].itemId] += storagePool[i].grids[j].count;
                         }
                     }
                 }
@@ -653,7 +664,7 @@ namespace PlanetWormhole.Data
                 {
                     if (tankPool[i].fluidId > 0)
                     {
-                        producedQuota[itemId2Index[tankPool[i].fluidId]] += tankPool[i].fluidCount;
+                        producedQuota[tankPool[i].fluidId] += tankPool[i].fluidCount;
                     }
                 }
             }
@@ -675,11 +686,11 @@ namespace PlanetWormhole.Data
                     {
                         if (storagePool[i].grids[j].itemId > 0)
                         {
-                            int itemIndex = itemId2Index[storagePool[i].grids[j].itemId];
-                            if (servedQuota[itemIndex] > produced[itemIndex])
+                            int itemId = storagePool[i].grids[j].itemId;
+                            if (servedQuota[itemId] > produced[itemId])
                             {
-                                int count = Math.Min(storagePool[i].grids[j].count, servedQuota[itemIndex] - produced[itemIndex]);
-                                produced[itemIndex] += count;
+                                int count = Math.Min(storagePool[i].grids[j].count, servedQuota[itemId] - produced[itemId]);
+                                produced[itemId] += count;
                                 storagePool[i].grids[j].count -= count;
                                 if (storagePool[i].grids[j].count <= 0)
                                 {
@@ -710,11 +721,11 @@ namespace PlanetWormhole.Data
                 {
                     if (tankPool[i].fluidId > 0)
                     {
-                        int itemIndex = itemId2Index[tankPool[i].fluidId];
-                        if (servedQuota[itemIndex] > produced[itemIndex])
+                        int itemId = tankPool[i].fluidId;
+                        if (servedQuota[itemId] > produced[itemId])
                         {
-                            int count = Math.Min(tankPool[i].fluidCount, servedQuota[itemIndex] - produced[itemIndex]);
-                            produced[itemIndex] += count;
+                            int count = Math.Min(tankPool[i].fluidCount, servedQuota[itemId] - produced[itemId]);
+                            produced[itemId] += count;
                             tankPool[i].fluidCount -= count;
                             if (tankPool[i].fluidCount <= 0)
                             {
@@ -739,7 +750,7 @@ namespace PlanetWormhole.Data
             {
                 if (trashObjs[i].item > 0)
                 {
-                    producedQuota[itemId2Index[trashObjs[i].item]] += trashObjs[i].count;
+                    producedQuota[trashObjs[i].item] += trashObjs[i].count;
                 }
             }
         }
@@ -752,11 +763,11 @@ namespace PlanetWormhole.Data
             {
                 if (trashObjs[i].item > 0)
                 {
-                    int itemIndex = itemId2Index[trashObjs[i].item];
-                    if (servedQuota[itemIndex] > produced[itemIndex])
+                    int itemId = trashObjs[i].item;
+                    if (servedQuota[itemId] > produced[itemId])
                     {
-                        int count = Math.Min(trashObjs[i].count, servedQuota[itemIndex] - produced[itemIndex]);
-                        produced[itemIndex] += count;
+                        int count = Math.Min(trashObjs[i].count, servedQuota[itemId] - produced[itemId]);
+                        produced[itemId] += count;
                         trashObjs[i].count -= count;
                         int incAdd = _split_inc(trashObjs[i].inc, count);
                         inc += incAdd;
@@ -770,29 +781,9 @@ namespace PlanetWormhole.Data
             }
         }
 
-        private void Spray()
-        {
-            if (inc < sumSpray)
-            {
-                if (producedQuota[PROLIF_MK3_INDEX] > served[PROLIF_MK3_INDEX])
-                {
-                    int count = Math.Min(
-                        (sumSpray - inc - 1) / (INC_SPRAY_TIMES + EXTRA_INC_SPRAY_TIMES - 1) + 1, producedQuota[PROLIF_MK3_INDEX] - served[PROLIF_MK3_INDEX]);
-                    inc += count * (INC_SPRAY_TIMES + EXTRA_INC_SPRAY_TIMES - 1);
-                    servedQuota[PROLIF_MK3_INDEX] += count;
-                    served[PROLIF_MK3_INDEX] += count;
-                    consumedProliferator = count;
-                }
-            }
-            if (inc < 1)
-            {
-                spray = false;
-            }
-        }
-
         private void ConsumeBuffer()
         {
-            for (int i = 0; i < N; i++)
+            for (int i = 0; i < MAX_ITEM_COUNT; i++)
             {
                 if (servedQuota[i] > produced[i] && buffer[i] > 0)
                 {
@@ -800,6 +791,106 @@ namespace PlanetWormhole.Data
                     produced[i] += count;
                     buffer[i] -= count;
                 }
+            }
+        }
+
+        private void RegisterFractionator()
+        {
+            FractionatorComponent[] pool = tmpFactory.factorySystem.fractionatorPool;
+            for(int i = 0; i < tmpFactory.factorySystem.fractionatorCursor; i++)
+            {
+                if (pool[i].id == i)
+                {
+                    if (pool[i].fluidId > 0)
+                    {
+                        int count = _positive(pool[i].fluidInputMax * 4 - pool[i].fluidInputCount);
+                        servedQuota[pool[i].fluidId] += count;
+                        sumSpray += count;
+                        count = _positive(pool[i].fluidOutputMax - pool[i].fluidOutputCount);
+                        producedQuota[pool[i].fluidId] += count;
+                    }
+                    if (pool[i].productId > 0)
+                    {
+                        producedQuota[pool[i].productId] += pool[i].productOutputCount;
+                    }
+                }
+            }
+        }
+
+        private void ConsumeFractionator()
+        {
+            FractionatorComponent[] pool = tmpFactory.factorySystem.fractionatorPool;
+            for (int i = 0; i < tmpFactory.factorySystem.fractionatorCursor; i++)
+            {
+                if (pool[i].id == i)
+                {
+                    if (pool[i].fluidId > 0)
+                    {
+                        int itemId = pool[i].fluidId;
+                        int count;
+                        if (producedQuota[itemId] > served[itemId])
+                        {
+                            count = _positive(Math.Min(pool[i].fluidInputMax * 4 - pool[i].fluidInputCount, producedQuota[itemId] - served[itemId]));
+                            served[itemId] += count;
+                            pool[i].fluidInputCount += count;
+                            pool[i].fluidInputCargoCount += .25f * count;
+                            if (spray)
+                            {
+                                inc -= count * INC_ABILITY;
+                                pool[i].fluidInputInc += count * INC_ABILITY;
+                            }
+                        }
+                        if (servedQuota[itemId] > produced[itemId])
+                        {
+                            count = Math.Min(pool[i].fluidOutputCount, servedQuota[itemId] - produced[itemId]);
+                            produced[itemId] += count;
+                            pool[i].fluidOutputCount -= count;
+                            int incAdd = _split_inc(pool[i].fluidOutputInc, count);
+                            inc += incAdd;
+                            pool[i].fluidOutputInc -= incAdd;
+                        }
+                        if (pool[i].fluidOutputCount >= pool[i].fluidOutputMax && buffer[pool[i].fluidId] < BUFFER_SIZE)
+                        {
+                            count = pool[i].fluidOutputCount - pool[i].fluidOutputMax + 1;
+                            pool[i].fluidOutputCount -= count;
+                            buffer[pool[i].fluidId] += count;
+                            int incAdd = _split_inc(pool[i].fluidOutputInc, count);
+                            inc += incAdd;
+                            pool[i].fluidOutputInc -= inc;
+                        }
+                    }
+                    if (pool[i].productId > 0)
+                    {
+                        int itemId = pool[i].productId;
+                        if (servedQuota[itemId] > produced[itemId])
+                        {
+                            int count = Math.Min(pool[i].productOutputCount, servedQuota[itemId] - produced[itemId]);
+                            produced[itemId] += count;
+                            pool[i].productOutputCount -= count;
+                        }
+                    }
+                }
+            }
+        }
+
+        private void Spray()
+        {
+            if (inc < sumSpray * INC_ABILITY)
+            {
+                if (producedQuota[PROLIFERATOR_MK3] > served[PROLIFERATOR_MK3])
+                {
+                    int count = Math.Min(
+                        (sumSpray * INC_ABILITY - inc - 1) / (INC_SPRAY_TIMES + EXTRA_INC_SPRAY_TIMES - 1) / INC_ABILITY + 1
+                        , producedQuota[PROLIFERATOR_MK3] - served[PROLIFERATOR_MK3]);
+                    inc += count * (INC_SPRAY_TIMES + EXTRA_INC_SPRAY_TIMES - 1) * INC_ABILITY;
+                    servedQuota[PROLIFERATOR_MK3] += count;
+                    served[PROLIFERATOR_MK3] += count;
+                    consumedProliferator = count;
+                }
+            }
+            if (inc < 1)
+            {
+                spray = false;
             }
         }
 
@@ -812,18 +903,10 @@ namespace PlanetWormhole.Data
 
         static Wormhole()
         {
-            itemId2Index = new Dictionary<int, int>();
-            ItemProto[] items = LDB.items.dataArray;
-            N = items.Length;
-            for (int i = 0; i < N; i++)
-            {
-                itemId2Index.Add(items[i].ID, i);
-            }
-            ItemProto proto = LDB.items.Select(Constants.PROLIFERATOR_MK3);
+            ItemProto proto = LDB.items.Select(PROLIFERATOR_MK3);
             INC_SPRAY_TIMES = proto.HpMax;
             INC_ABILITY = proto.Ability;
             EXTRA_INC_SPRAY_TIMES = (int)(INC_SPRAY_TIMES * (Cargo.incTable[INC_ABILITY] * 0.001) + 0.1);
-            PROLIF_MK3_INDEX = itemId2Index[Constants.PROLIFERATOR_MK3];
         }
     }
 }

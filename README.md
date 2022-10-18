@@ -20,6 +20,10 @@ Automatically transfer cargos within a planet. You do not need planetary logisti
 
 ## ChangeLog
 
+### 1.0.6
+
+Support fractionator. Use multiplethread to do the computation.
+
 ### 1.0.5
 
 Fix exception when remove a station.
