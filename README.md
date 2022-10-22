@@ -6,7 +6,7 @@ Automatically transfer cargos within a planet. You do not need planetary logisti
 
 ||Default|Description|
 |:---|:---|:---|
-|`EnableInterstella`|true|enable auto interstellar transportation|
+|`EnableInterstellar`|true|enable auto interstellar transportation|
 
 ---
 # 行星虫洞
@@ -16,7 +16,7 @@ Automatically transfer cargos within a planet. You do not need planetary logisti
 ## 配置
 ||默认值|描述|
 |:---|:---|:---|
-|`EnableInterstella`|true|启动自动星际物流|
+|`EnableInterstellar`|true|启动自动星际物流|
 
 ## ChangeLog
 
