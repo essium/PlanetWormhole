@@ -6,7 +6,7 @@ Automatically transfer cargos within a planet. You do not need planetary logisti
 
 ||Default|Description|
 |:---|:---|:---|
-|`Enable`|true|enable this plugin|
+|`EnableInterstella`|true|enable auto interstellar transportation|
 
 ---
 # 行星虫洞
@@ -16,9 +16,15 @@ Automatically transfer cargos within a planet. You do not need planetary logisti
 ## 配置
 ||默认值|描述|
 |:---|:---|:---|
-|`Enable`|true|启动这个插件|
+|`EnableInterstella`|true|启动自动星际物流|
 
 ## ChangeLog
+
+### 1.0.7
+
+Auto interstellar transportation.
+Fix multithread bug for trash.
+Computation cost for this plugin is added to belt.
 
 ### 1.0.6
 

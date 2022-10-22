@@ -62,10 +62,16 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Constants.cs" />
-    <Compile Include="Data\PlanetThreadObject.cs" />
-    <Compile Include="Data\Wormhole.cs" />
+    <Compile Include="Data\Cosmic.cs" />
+    <Compile Include="Data\LocalPlanet.cs" />
     <Compile Include="PlanetWormhole.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="StateMachine\StateMachine.cs" />
+    <Compile Include="Util\Functions.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="manifest.json" />
+    <None Include="README.md" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
