@@ -81,7 +81,7 @@ namespace PlanetWormhole.Data
                         trashObjs[i].count -= count;
                         if (trashObjs[i].count <= 0)
                         {
-                            container.RemoveTrash(i);
+                            data.trashSystem.RemoveTrash(i);
                         }
                     }
                 }
