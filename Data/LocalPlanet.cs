@@ -43,6 +43,7 @@ namespace PlanetWormhole.Data
         public void PatchPlanet(object stateInfo = null)
         {
             Reset();
+            RegisterTrash();
             RegisterPowerSystem();
             RegisterMiner();
             RegisterAssembler();
@@ -695,6 +696,16 @@ namespace PlanetWormhole.Data
                     }
                 }
             }
+        }
+
+        private void RegisterTrash()
+        {
+            Cosmic.mutex.WaitOne();
+            for (int i = 0; i < MAX_ITEM_COUNT; i++)
+            {
+                    produced[i] += cosmic.trashProduced[i];
+            }
+            Cosmic.mutex.ReleaseMutex();
         }
 
         private void ConsumeTrash()
