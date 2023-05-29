@@ -20,6 +20,10 @@ Automatically transfer cargos within a planet. You do not need planetary logisti
 
 ## ChangeLog
 
+### 1.0.10
+
+Fix storage connection with sorter and fractionator logic.
+
 ### 1.0.9
 
 Fix trash logic.

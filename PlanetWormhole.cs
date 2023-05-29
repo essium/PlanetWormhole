@@ -14,7 +14,7 @@ namespace PlanetWormhole
     {
         private const string package = "essium.DSP.PlanetWormhole";
         private const string plugin = "PlanetWormhole";
-        private const string version = "1.0.9";
+        private const string version = "1.0.10";
 
         private static List<LocalPlanet> planetWormhole;
         private static Cosmic globalWormhole;

@@ -670,7 +670,7 @@ namespace PlanetWormhole.Data
                     }
                     if (change)
                     {
-                        storagePool[i].NotifyStorageChange();
+                        storagePool[i].Sort();
                     }
                 }
             }
@@ -744,18 +744,20 @@ namespace PlanetWormhole.Data
             {
                 if (pool[i].id == i)
                 {
+                    // PlanetWormhole.LogInfo("prepare to spary " + sumSpray + " times before register");
                     if (pool[i].fluidId > 0)
                     {
                         int count = _positive(pool[i].fluidInputMax * 4 - pool[i].fluidInputCount);
                         served[pool[i].fluidId] += count;
                         sumSpray += count;
-                        count = _positive(pool[i].fluidOutputMax - pool[i].fluidOutputCount);
+                        count = _positive(pool[i].fluidOutputCount);
                         produced[pool[i].fluidId] += count;
                     }
                     if (pool[i].productId > 0)
                     {
-                        produced[pool[i].productId] += pool[i].productOutputCount;
+                        produced[pool[i].productId] += _positive(pool[i].productOutputCount - 1);
                     }
+                    // PlanetWormhole.LogInfo("prepare to spary " + sumSpray + " times after register");
                 }
             }
         }
@@ -769,6 +771,7 @@ namespace PlanetWormhole.Data
                 int i = (int)((r + k) % (factory.factorySystem.fractionatorCursor - 1)) + 1;
                 if (pool[i].id == i)
                 {
+                    // PlanetWormhole.LogInfo("inc: " + inc + ", output inc: " + pool[i].fluidOutputInc + " before consume");
                     if (pool[i].fluidId > 0)
                     {
                         int itemId = pool[i].fluidId;
@@ -779,25 +782,27 @@ namespace PlanetWormhole.Data
                             inc -= count * INC_ABILITY;
                             pool[i].fluidInputInc += count * INC_ABILITY;
                         }
-                        _produce(itemId, served, ref pool[i].fluidOutputCount, ref count);
+                        if (buffer[itemId] < BUFFER_SIZE)
+                        {
+                            count = _positive(pool[i].fluidOutputCount);
+                            buffer[itemId] += count;
+                            pool[i].fluidOutputCount -= count;
+                        } else
+                        {
+                            _produce(itemId, served, ref pool[i].fluidOutputCount, ref count);
+                        }
                         int incAdd = _split_inc(pool[i].fluidOutputInc, count);
                         inc += incAdd;
                         pool[i].fluidOutputInc -= incAdd;
-                        if (pool[i].fluidOutputCount >= pool[i].fluidOutputMax && buffer[pool[i].fluidId] < BUFFER_SIZE)
-                        {
-                            count = pool[i].fluidOutputCount - pool[i].fluidOutputMax + 1;
-                            pool[i].fluidOutputCount -= count;
-                            buffer[pool[i].fluidId] += count;
-                            incAdd = _split_inc(pool[i].fluidOutputInc, count);
-                            inc += incAdd;
-                            pool[i].fluidOutputInc -= inc;
-                        }
                     }
-                    if (pool[i].productId > 0)
+                    if (pool[i].productId > 1)
                     {
                         int itemId = pool[i].productId;
+                        pool[i].productOutputCount -= 1;
                         _produce(itemId, served, ref pool[i].productOutputCount, ref count);
+                        pool[i].productOutputCount += 1;
                     }
+                    // PlanetWormhole.LogInfo("inc: " + inc + ", output inc: " + pool[i].fluidOutputInc + " after consume");
                 }
             }
         }
