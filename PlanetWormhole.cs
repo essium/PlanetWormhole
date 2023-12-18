@@ -14,7 +14,7 @@ namespace PlanetWormhole
     {
         private const string package = "essium.DSP.PlanetWormhole";
         private const string plugin = "PlanetWormhole";
-        private const string version = "1.0.10";
+        private const string version = "2.0.0";
 
         private static List<LocalPlanet> planetWormhole;
         private static Cosmic globalWormhole;
@@ -27,6 +27,10 @@ namespace PlanetWormhole
         private static void _postfix_GameData_GameTick(GameData __instance,
             long time)
         {
+            if (GameMain.instance.isMenuDemo)
+            {
+                return;
+            }
             PerformanceMonitor.BeginSample(ECpuWorkEntry.Belt);
             while(planetWormhole.Count < __instance.factoryCount)
             {
@@ -51,6 +55,10 @@ namespace PlanetWormhole
         private static void _postfix_ProductionStatistics_GameTick(ProductionStatistics __instance,
             long time)
         {
+            if (GameMain.instance.isMenuDemo)
+            {
+                return;
+            }
             for (int i = 0; i < __instance.gameData.factoryCount; i++)
             {
                 if (planetWormhole.Count > i)

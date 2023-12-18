@@ -26,9 +26,14 @@ namespace PlanetWormhole.Data
             produced = new int[MAX_ITEM_COUNT];
             served = new int[MAX_ITEM_COUNT];
             buffer = new int[MAX_ITEM_COUNT];
+            Init();
+            completeSignal = new AutoResetEvent(false);
+        }
+
+        public void Init()
+        {
             Array.Clear(buffer, 0, MAX_ITEM_COUNT);
             inc = 0;
-            completeSignal = new AutoResetEvent(false);
         }
 
         public void SetFactory(PlanetFactory factory)
@@ -45,6 +50,7 @@ namespace PlanetWormhole.Data
             Reset();
             RegisterTrash();
             RegisterPowerSystem();
+            RegisterTurret();
             RegisterMiner();
             RegisterAssembler();
             RegisterFractionator();
@@ -58,6 +64,7 @@ namespace PlanetWormhole.Data
             ConsumeTrash();
             ConsumeStorage();
             ConsumePowerSystem();
+            ConsumeTurret();
             ConsumeMiner();
             ConsumeFractionator();
             ConsumeAssembler();
@@ -683,6 +690,18 @@ namespace PlanetWormhole.Data
                     if (tankPool[i].fluidId > 0)
                     {
                         int itemId = tankPool[i].fluidId;
+                        if (buffer[itemId] > 0)
+                        {
+                            if (tankPool[i].fluidCount < tankPool[i].fluidCapacity)
+                            {
+                                count = Math.Min(buffer[itemId], tankPool[i].fluidCapacity - tankPool[i].fluidCount);
+                                buffer[itemId] -= count;
+                                tankPool[i].fluidCount += count;
+                            } else if (tankPool[i].nextTankId > 0)
+                            {
+                                tankPool[tankPool[i].nextTankId].fluidId = itemId;
+                            }
+                        }
                         _produce(itemId, served, ref tankPool[i].fluidCount, ref count);
                         int incAdd = _split_inc(tankPool[i].fluidInc, count);
                         inc += incAdd;
@@ -744,7 +763,6 @@ namespace PlanetWormhole.Data
             {
                 if (pool[i].id == i)
                 {
-                    // PlanetWormhole.LogInfo("prepare to spary " + sumSpray + " times before register");
                     if (pool[i].fluidId > 0)
                     {
                         int count = _positive(pool[i].fluidInputMax * 4 - pool[i].fluidInputCount);
@@ -757,7 +775,6 @@ namespace PlanetWormhole.Data
                     {
                         produced[pool[i].productId] += _positive(pool[i].productOutputCount - 1);
                     }
-                    // PlanetWormhole.LogInfo("prepare to spary " + sumSpray + " times after register");
                 }
             }
         }
@@ -771,7 +788,6 @@ namespace PlanetWormhole.Data
                 int i = (int)((r + k) % (factory.factorySystem.fractionatorCursor - 1)) + 1;
                 if (pool[i].id == i)
                 {
-                    // PlanetWormhole.LogInfo("inc: " + inc + ", output inc: " + pool[i].fluidOutputInc + " before consume");
                     if (pool[i].fluidId > 0)
                     {
                         int itemId = pool[i].fluidId;
@@ -782,11 +798,10 @@ namespace PlanetWormhole.Data
                             inc -= count * INC_ABILITY;
                             pool[i].fluidInputInc += count * INC_ABILITY;
                         }
-                        if (buffer[itemId] < BUFFER_SIZE)
+                        if (buffer[itemId] < BUFFER_SIZE && pool[i].fluidOutputCount > pool[i].fluidOutputMax / 2)
                         {
-                            count = _positive(pool[i].fluidOutputCount);
-                            buffer[itemId] += count;
-                            pool[i].fluidOutputCount -= count;
+                            buffer[itemId] += pool[i].fluidOutputCount;
+                            pool[i].fluidOutputCount = 0;
                         } else
                         {
                             _produce(itemId, served, ref pool[i].fluidOutputCount, ref count);
@@ -802,7 +817,50 @@ namespace PlanetWormhole.Data
                         _produce(itemId, served, ref pool[i].productOutputCount, ref count);
                         pool[i].productOutputCount += 1;
                     }
-                    // PlanetWormhole.LogInfo("inc: " + inc + ", output inc: " + pool[i].fluidOutputInc + " after consume");
+                }
+            }
+        }
+
+        private void RegisterTurret()
+        {
+            TurretComponent[] pool = factory.defenseSystem.turrets.buffer;
+            int count = 0;
+            for (int k = 1; k < factory.defenseSystem.turrets.cursor; k++)
+            {
+                if (pool[k].id == k)
+                {
+                    if (pool[k].itemId > 0)
+                    {
+                        int itemId = pool[k].itemId;
+                        count = _positive(5 - pool[k].itemCount);
+                        served[itemId] += count;
+                        sumSpray += count;
+                    }
+                }
+            }
+        }
+
+        private void ConsumeTurret()
+        {
+            TurretComponent[] pool = factory.defenseSystem.turrets.buffer;
+            int count = 0;
+            for (int k = 1; k < factory.defenseSystem.turrets.cursor; k++)
+            {
+                int i = (int)((r + k) % (factory.defenseSystem.turrets.cursor - 1)) + 1;
+                if (pool[i].id == i)
+                {
+                    if (pool[i].itemId > 0)
+                    {
+                        int itemId = pool[i].itemId;
+                        int itemCount = pool[i].itemCount;
+                        _serve(itemId, produced, ref itemCount, 5, ref count);
+                        pool[i].itemCount = (short)itemCount;
+                        if (spray)
+                        {
+                            inc -= count * INC_ABILITY;
+                            pool[i].itemInc += (short)(count * INC_ABILITY);
+                        }
+                    }
                 }
             }
         }

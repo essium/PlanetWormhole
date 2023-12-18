@@ -1,6 +1,6 @@
 {
 	"name": "PlanetWormhole",
-	"version_number": "1.0.10",
+	"version_number": "2.0.0",
 	"website_url": "https://github.com/essium/PlanetWormhole",
 	"description": "Transfer items within each planet",
 	"dependencies":["xiaoye97-BepInEx-5.4.17"]
